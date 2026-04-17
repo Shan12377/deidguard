@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeIDGuard</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════════ -->
+<header class="app-header">
+  <div class="header-brand">
+    <span class="brand-icon" aria-hidden="true">🛡️</span>
+    <span class="brand-name">DeID<span class="brand-accent">Guard</span></span>
+  </div>
+  <div class="header-actions">
+    <button id="btn-history-toggle" class="icon-btn" title="View history" aria-label="Toggle history panel">
+      <span aria-hidden="true">🕓</span>
+    </button>
+    <button id="btn-settings-toggle" class="icon-btn" title="Settings" aria-label="Toggle settings panel">
+      <span aria-hidden="true">⚙️</span>
+    </button>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     PRIVACY BADGE
+════════════════════════════════════════════════════════════════ -->
+<div class="privacy-badge" id="privacy-badge">
+  <span class="badge-item" title="All processing happens in your browser">🔒 Processed locally</span>
+  <span class="badge-sep">·</span>
+  <span class="badge-item" title="No data sent to any server">☁️ No cloud sync</span>
+  <span class="badge-sep">·</span>
+  <span class="badge-item" title="No calls to external services">🚫 No external APIs</span>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MAIN PANEL (default view)
+════════════════════════════════════════════════════════════════ -->
+<main id="panel-main" class="panel active">
+
+  <!-- ── Status bar ── -->
+  <div id="status-bar" class="status-bar status-idle" role="status" aria-live="polite">
+    <span id="status-text">Highlight text on any page, then click the toolbar icon.</span>
+  </div>
+
+  <!-- ── Step 1: Original Text ── -->
+  <section class="step-section" id="section-original">
+    <div class="step-header">
+      <span class="step-badge">1</span>
+      <span class="step-label">Selected Text</span>
+      <button id="btn-refresh" class="micro-btn" title="Re-capture selected text from page">↺ Refresh</button>
+    </div>
+    <div id="original-empty" class="empty-state">
+      <p>No text selected.</p>
+      <p class="hint">Highlight text on any webpage, then click ↺ Refresh or reopen this popup.</p>
+    </div>
+    <textarea
+      id="original-text"
+      class="text-area hidden"
+      readonly
+      aria-label="Original selected text"
+      placeholder="Selected text will appear here…"
+    ></textarea>
+    <div class="char-count hidden" id="original-char-count"></div>
+  </section>
+
+  <!-- ── Step 2: De-Identify ── -->
+  <section class="step-section" id="section-deid">
+    <div class="step-header">
+      <span class="step-badge">2</span>
+      <span class="step-label">De-Identify</span>
+    </div>
+    <button id="btn-deid" class="btn btn-primary" disabled aria-label="De-identify selected text">
+      <span class="btn-icon">✦</span> De-Identify Text
+    </button>
+
+    <!-- Cleaned text output -->
+    <div id="cleaned-empty" class="empty-state hidden">
+      <p class="hint">De-identified text will appear here after processing.</p>
+    </div>
+    <div id="cleaned-result" class="hidden">
+      <div class="result-header">
+        <span class="result-label">Cleaned Text</span>
+        <span id="changes-badge" class="changes-badge"></span>
+      </div>
+      <textarea
+        id="cleaned-text"
+        class="text-area"
+        aria-label="De-identified cleaned text"
+        spellcheck="false"
+      ></textarea>
+      <div class="char-count" id="cleaned-char-count"></div>
+      <div id="deid-summary" class="deid-summary"></div>
+      <!-- Re-identification Risk Score (v1.2.0) -->
+      <div id="risk-score-panel" class="risk-score-panel hidden" role="region" aria-label="Re-identification risk score">
+        <div class="risk-score-header">
+          <span class="risk-label">Re-ID Risk</span>
+          <span id="risk-score-value" class="risk-badge risk-low">LOW</span>
+        </div>
+        <p class="risk-desc">Quasi-identifier factors remaining in cleaned text:</p>
+        <ul id="risk-score-factors" class="risk-factors"></ul>
+        <p class="risk-note">Risk score reflects quasi-identifiers (age, gender, condition, geography) that may allow re-identification even after direct identifier removal. Review before sharing.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Step 3: Rule Check ── -->
+  <section class="step-section" id="section-rules">
+    <div class="step-header">
+      <span class="step-badge">3</span>
+      <span class="step-label">Rule-Based Review</span>
+      <span id="mode-badge" class="mode-badge">Basic</span>
+    </div>
+    <button id="btn-rules" class="btn btn-secondary" disabled aria-label="Run rule-based review on cleaned text">
+      <span class="btn-icon">🔍</span> Run Rule Check
+    </button>
+
+    <!-- Flags output -->
+    <div id="flags-container" class="hidden">
+      <div id="no-flags" class="hidden">
+        <div class="flags-clear">
+          <span class="flags-clear-icon">✓</span>
+          <span>No rule flags found.</span>
+        </div>
+      </div>
+      <div id="flags-list" class="flags-list"></div>
+    </div>
+  </section>
+
+  <!-- ── Step 4: Export ── -->
+  <section class="step-section" id="section-export">
+    <div class="step-header">
+      <span class="step-badge">4</span>
+      <span class="step-label">Copy & Use</span>
+    </div>
+    <div class="export-actions">
+      <button id="btn-copy" class="btn btn-teal" disabled aria-label="Copy cleaned text to clipboard">
+        <span class="btn-icon">📋</span> Copy Clean Text
+      </button>
+    </div>
+    <div class="ai-buttons">
+      <span class="ai-label">Open in AI tool (paste manually):</span>
+      <div class="ai-btn-row">
+        <button id="btn-claude" class="btn btn-ai" disabled title="Open Claude in a new tab — paste text manually">
+          Claude ↗
+        </button>
+        <button id="btn-chatgpt" class="btn btn-ai" disabled title="Open ChatGPT in a new tab — paste text manually">
+          ChatGPT ↗
+        </button>
+      </div>
+      <p class="paste-hint hidden" id="paste-hint">
+        ✓ Copied! Switch to the AI tab and paste with <kbd>Ctrl+V</kbd> / <kbd>⌘V</kbd>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ── Disclaimer ── -->
+  <footer class="disclaimer">
+    <span class="disclaimer-icon">⚠️</span>
+    Assists with de-identification and rule review. Final review is your responsibility.
+    Not legal advice. Not HIPAA certification.
+  </footer>
+
+</main>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HISTORY PANEL
+════════════════════════════════════════════════════════════════ -->
+<div id="panel-history" class="panel slide-panel hidden">
+  <div class="panel-toolbar">
+    <h2 class="panel-title">Recent History</h2>
+    <button id="btn-history-close" class="icon-btn" aria-label="Close history panel">✕</button>
+  </div>
+  <p class="panel-desc">Last 5 de-identified texts. Stored locally only.</p>
+  <div id="history-empty" class="empty-state">
+    <p>No history yet.</p>
+    <p class="hint">De-identify some text to see it here.</p>
+  </div>
+  <ul id="history-list" class="history-list" aria-label="De-identification history"></ul>
+  <div class="panel-footer">
+    <button id="btn-clear-history" class="btn btn-danger-ghost">🗑 Clear All History</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SETTINGS PANEL
+════════════════════════════════════════════════════════════════ -->
+<div id="panel-settings" class="panel slide-panel hidden">
+  <div class="panel-toolbar">
+    <h2 class="panel-title">Settings</h2>
+    <button id="btn-settings-close" class="icon-btn" aria-label="Close settings panel">✕</button>
+  </div>
+  <p class="panel-desc">All settings stored locally on your device.</p>
+
+  <div class="settings-group">
+    <label class="setting-label" for="select-mode">Review Mode</label>
+    <select id="select-mode" class="select-input" aria-label="Review mode selector">
+      <option value="basic">Basic</option>
+      <option value="healthcare_pro">Healthcare Pro</option>
+      <option value="ftc_hipra">FTC / HIPRA (Non-HIPAA Entities)</option>
+      <option value="custom">Custom Rules</option>
+    </select>
+    <p class="setting-hint">
+      <strong>Basic:</strong> General-purpose scope-of-practice flags.<br>
+      <strong>Healthcare Pro:</strong> Clinical, Rx, lab language + Texas RAIA AI disclosure flags.<br>
+      <strong>FTC / HIPRA:</strong> For health coaches, wellness apps, and non-HIPAA entities. FTC Section 5, Health Breach Notification Rule, and HIPRA (Nov 2025) readiness.<br>
+      <strong>Custom:</strong> Your own rules only.
+    </p>
+  </div>
+
+  <div class="settings-group">
+    <label class="setting-label">Person Label</label>
+    <div class="toggle-row">
+      <span class="toggle-opt" id="label-patient-opt">Patient X</span>
+      <label class="toggle-switch" aria-label="Toggle person label between Patient and Client">
+        <input type="checkbox" id="toggle-client-label" />
+        <span class="toggle-track"></span>
+      </label>
+      <span class="toggle-opt" id="label-client-opt">Client X</span>
+    </div>
+    <p class="setting-hint">Controls how detected names are replaced.</p>
+  </div>
+
+  <div class="settings-group">
+    <label class="setting-label">Date Granularity</label>
+    <div class="toggle-row">
+      <span class="toggle-opt">Year only</span>
+      <label class="toggle-switch" aria-label="Toggle date granularity">
+        <input type="checkbox" id="toggle-date-granularity" />
+        <span class="toggle-track"></span>
+      </label>
+      <span class="toggle-opt">Month + Year</span>
+    </div>
+    <p class="setting-hint">
+      <em>Year only:</em> "Mar 15 2023" → [YEAR: 2023]<br>
+      <em>Month + Year:</em> "Mar 15 2023" → [DATE: Mar 2023]
+    </p>
+  </div>
+
+  <!-- Custom Rules Editor (shown when mode = custom) -->
+  <div id="custom-rules-section" class="settings-group hidden">
+    <label class="setting-label">Custom Rules</label>
+    <p class="setting-hint">One rule per line. Format: <code>pattern | message | severity</code><br>
+    Severity: <code>high</code>, <code>medium</code>, or <code>low</code></p>
+    <textarea
+      id="custom-rules-input"
+      class="text-area text-area-sm"
+      placeholder="\\bcure\\b | Cure claim detected | high&#10;\\bguarantee\\b | Guarantee language | medium"
+      aria-label="Custom rules input"
+      spellcheck="false"
+    ></textarea>
+    <button id="btn-save-custom-rules" class="btn btn-primary" style="margin-top:8px;">
+      Save Custom Rules
+    </button>
+    <div id="custom-rules-status" class="status-inline hidden"></div>
+  </div>
+
+  <div class="settings-group">
+    <label class="setting-label">Privacy Badge</label>
+    <div class="toggle-row">
+      <label class="toggle-switch" aria-label="Show or hide privacy badge">
+        <input type="checkbox" id="toggle-privacy-badge" checked />
+        <span class="toggle-track"></span>
+      </label>
+      <span class="toggle-opt">Show privacy notice</span>
+    </div>
+  </div>
+
+  <div class="panel-footer">
+    <button id="btn-reset-settings" class="btn btn-danger-ghost">↺ Reset to Defaults</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     SCRIPTS — order matters: libs first, then popup logic
+════════════════════════════════════════════════════════════════ -->
+<script src="../lib/deid.js"></script>
+<script src="../lib/rules.js"></script>
+<script src="popup.js"></script>
+
+</body>
+</html>
