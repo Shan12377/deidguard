@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "DeIDGuard – Private Text De-Identifier",
+  "short_name": "DeIDGuard",
+  "version": "1.2.0",
+  "description": "Locally de-identify sensitive text before sharing with AI tools. Privacy-first — no cloud sync, no external APIs, no data leaves your device.",
+
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel"
+  ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
+
+  "action": {
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "DeIDGuard – Open Side Panel"
+  },
+
+  "side_panel": {
+    "default_path": "popup/popup.html"
+  },
+
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+
+  "web_accessible_resources": [
+    {
+      "resources": ["privacy_policy.html"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+
+  "commands": {
+    "open_side_panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+D",
+        "mac": "Command+Shift+D"
+      },
+      "description": "Open DeIDGuard side panel to de-identify selected text"
+    }
+  }
+}
